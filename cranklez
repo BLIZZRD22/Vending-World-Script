@@ -1,0 +1,315 @@
+-- // LocalScript
+-- Place inside StarterPlayerScripts
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+
+-- Default settings
+local targetName = "Basic Box"
+local range = 10
+local checkInterval = 0.1
+local autoClickEnabled = false
+local showPromptsEnabled = false
+local autoTeleportEnabled = false
+local teleportInterval = 1 -- seconds
+local lastPrompt = nil -- to avoid teleporting to same prompt
+
+-- === GUI SETUP ===
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoClickUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- === Floating Toggle Button (like IY) ===
+local toggleCircle = Instance.new("TextButton")
+toggleCircle.Name = "ToggleCircle"
+toggleCircle.Size = UDim2.new(0, 50, 0, 50)
+toggleCircle.Position = UDim2.new(0, 30, 0.7, 0)
+toggleCircle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+toggleCircle.Text = "AC"
+toggleCircle.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleCircle.Font = Enum.Font.GothamBold
+toggleCircle.TextSize = 18
+toggleCircle.Active = true
+toggleCircle.Draggable = true
+toggleCircle.Parent = gui
+Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
+
+-- === 🍬 Floating Prompt Display Toggle ===
+local promptCircle = Instance.new("TextButton")
+promptCircle.Name = "PromptCircle"
+promptCircle.Size = UDim2.new(0, 50, 0, 50)
+promptCircle.Position = UDim2.new(0, 90, 0.7, 0)
+promptCircle.BackgroundColor3 = Color3.fromRGB(50, 35, 50)
+promptCircle.Text = "🍬"
+promptCircle.TextColor3 = Color3.fromRGB(255, 255, 255)
+promptCircle.Font = Enum.Font.GothamBold
+promptCircle.TextSize = 24
+promptCircle.Active = true
+promptCircle.Draggable = true
+promptCircle.Parent = gui
+Instance.new("UICorner", promptCircle).CornerRadius = UDim.new(1, 0)
+
+-- === Main GUI ===
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 180, 0, 300)
+mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = false
+mainFrame.Parent = gui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel")
+title.Text = "Auto Clicker"
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+
+local contents = Instance.new("Frame")
+contents.Size = UDim2.new(1, -10, 1, -35)
+contents.Position = UDim2.new(0, 5, 0, 30)
+contents.BackgroundTransparency = 1
+contents.Parent = mainFrame
+
+-- === Helper functions ===
+local function makeBox(y, placeholder, default)
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -10, 0, 30)
+	box.Position = UDim2.new(0, 5, 0, y)
+	box.PlaceholderText = placeholder
+	box.Text = default
+	box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	box.TextColor3 = Color3.new(1, 1, 1)
+	box.Font = Enum.Font.Gotham
+	box.TextSize = 14
+	box.Parent = contents
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+	return box
+end
+
+local function makeButton(y, text, color)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -10, 0, 35)
+	btn.Position = UDim2.new(0, 5, 0, y)
+	btn.Text = text
+	btn.BackgroundColor3 = color
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.Parent = contents
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	return btn
+end
+
+-- === Buttons and Inputs ===
+local toggleBtn = makeButton(0, "Auto Click: OFF", Color3.fromRGB(200, 50, 50))
+local nameBox  = makeBox(45, "Item name (blank = all)", targetName)
+local rangeBox = makeBox(85, "Range (studs)", tostring(range))
+local speedBox = makeBox(125, "Click Speed (sec)", tostring(checkInterval))
+local tpSpeedBox = makeBox(165, "Teleport Speed (sec)", tostring(teleportInterval))
+local tpBtn = makeButton(205, "Auto Teleport: OFF", Color3.fromRGB(50, 50, 150))
+
+local tpStatus = Instance.new("TextLabel")
+tpStatus.Size = UDim2.new(1, -10, 0, 20)
+tpStatus.Position = UDim2.new(0, 5, 0, 245)
+tpStatus.BackgroundTransparency = 1
+tpStatus.Text = ""
+tpStatus.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+tpStatus.Font = Enum.Font.Gotham
+tpStatus.TextSize = 14
+tpStatus.Parent = contents
+
+-- === Show / Hide Main GUI ===
+toggleCircle.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- === INPUT HANDLERS ===
+nameBox.FocusLost:Connect(function(enter)
+	if enter then targetName = nameBox.Text end
+end)
+
+rangeBox.FocusLost:Connect(function(enter)
+	if enter then
+		local n = tonumber(rangeBox.Text)
+		if n and n > 0 then range = n end
+	end
+end)
+
+speedBox.FocusLost:Connect(function(enter)
+	if enter then
+		local n = tonumber(speedBox.Text)
+		if n and n > 0.01 then checkInterval = n end
+	end
+end)
+
+tpSpeedBox.FocusLost:Connect(function(enter)
+	if enter then
+		local n = tonumber(tpSpeedBox.Text)
+		if n and n > 0 then teleportInterval = n end
+	end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	autoClickEnabled = not autoClickEnabled
+	if autoClickEnabled then
+		toggleBtn.Text = "Auto Click: ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	else
+		toggleBtn.Text = "Auto Click: OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
+
+-- ✅ FIXED TELEPORT BUTTON
+tpBtn.MouseButton1Click:Connect(function()
+	autoTeleportEnabled = not autoTeleportEnabled
+	if autoTeleportEnabled then
+		tpBtn.Text = "Auto Teleport: ON"
+		tpBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 255)
+
+		for _, g in ipairs(player.PlayerGui:GetChildren()) do
+			if g:IsA("ScreenGui") and g.Name ~= "AutoClickUI" then
+				g.Enabled = false
+			end
+		end
+	else
+		tpBtn.Text = "Auto Teleport: OFF"
+		tpBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 150)
+
+		for _, g in ipairs(player.PlayerGui:GetChildren()) do
+			if g:IsA("ScreenGui") and g.Name ~= "AutoClickUI" then
+				g.Enabled = true
+			end
+		end
+	end
+end)
+
+-- === 🍬 TOGGLE SHOW PROMPTS ===
+promptCircle.MouseButton1Click:Connect(function()
+	showPromptsEnabled = not showPromptsEnabled
+	if showPromptsEnabled then
+		promptCircle.BackgroundColor3 = Color3.fromRGB(100, 70, 150)
+	else
+		promptCircle.BackgroundColor3 = Color3.fromRGB(50, 35, 50)
+		for _, tag in ipairs(workspace:GetDescendants()) do
+			if tag:IsA("BillboardGui") and tag.Name == "_PromptLabel" then
+				tag:Destroy()
+			end
+		end
+	end
+end)
+
+-- === IGNORE LIST ===
+local ignoreNames = {
+	["ViewPrompt"] = true,
+	["PurchasePrompt"] = true,
+	["Purchase"] = true,
+	["View"] = true,
+	["ConfirmPrompt"] = true,
+}
+
+-- === MAIN AUTO CLICK LOOP ===
+task.spawn(function()
+	while task.wait(checkInterval) do
+		if not character or not root or not root.Parent then
+			character = player.Character or player.CharacterAdded:Wait()
+			root = character:WaitForChild("HumanoidRootPart")
+		end
+
+		if autoClickEnabled then
+			for _, prompt in ipairs(workspace:GetDescendants()) do
+				if prompt:IsA("ProximityPrompt") and prompt.Enabled and not ignoreNames[prompt.Name] then
+					if prompt.Parent:IsA("BasePart") then
+						local dist = (prompt.Parent.Position - root.Position).Magnitude
+						if dist <= range and (targetName == "" or prompt.Name == targetName) then
+							fireproximityprompt(prompt)
+						end
+					end
+				end
+			end
+		end
+
+		if showPromptsEnabled then
+			for _, prompt in ipairs(workspace:GetDescendants()) do
+				if prompt:IsA("ProximityPrompt") and prompt.Enabled and not ignoreNames[prompt.Name] then
+					if prompt.Parent:IsA("BasePart") and not prompt.Parent:FindFirstChild("_PromptLabel") then
+						local billboard = Instance.new("BillboardGui")
+						billboard.Name = "_PromptLabel"
+						billboard.Size = UDim2.new(0, 100, 0, 30)
+						billboard.StudsOffset = Vector3.new(0, 2, 0)
+						billboard.AlwaysOnTop = true
+						billboard.Parent = prompt.Parent
+
+						local text = Instance.new("TextLabel")
+						text.Size = UDim2.new(1, 0, 1, 0)
+						text.BackgroundTransparency = 1
+						text.Text = prompt.Name
+						text.TextColor3 = Color3.new(1, 1, 0.6)
+						text.TextScaled = true
+						text.Font = Enum.Font.GothamBold
+						text.Parent = billboard
+					end
+				end
+			end
+		else
+			for _, guiObj in ipairs(workspace:GetDescendants()) do
+				if guiObj:IsA("BillboardGui") and guiObj.Name == "_PromptLabel" then
+					guiObj:Destroy()
+				end
+			end
+		end
+	end
+end)
+
+-- === 🧭 FIXED AUTO TELEPORT LOOP (avoids repeats) ===
+local visitedPrompts = {}
+
+task.spawn(function()
+	while task.wait(teleportInterval) do
+		if autoTeleportEnabled then
+			if not character or not root or not root.Parent then
+				character = player.Character or player.CharacterAdded:Wait()
+				root = character:WaitForChild("HumanoidRootPart")
+			end
+
+			local nearest, nearestDist
+			for _, prompt in ipairs(workspace:GetDescendants()) do
+				if prompt:IsA("ProximityPrompt") and prompt.Enabled and not ignoreNames[prompt.Name] then
+					if prompt.Parent:IsA("BasePart") and not visitedPrompts[prompt] then
+						local dist = (prompt.Parent.Position - root.Position).Magnitude
+						if not nearestDist or dist < nearestDist then
+							nearest = prompt
+							nearestDist = dist
+						end
+					end
+				end
+			end
+
+			if nearest and nearest.Parent:IsA("BasePart") then
+				root.CFrame = nearest.Parent.CFrame + Vector3.new(0, 3, 0)
+				tpStatus.Text = "Teleporting to: " .. nearest.Name
+				task.delay(0.8, function()
+					tpStatus.Text = ""
+				end)
+				visitedPrompts[nearest] = true
+				lastPrompt = nearest
+			else
+				-- Reset when all prompts are visited
+				visitedPrompts = {}
+				tpStatus.Text = "All prompts visited — restarting..."
+				task.delay(1, function()
+					tpStatus.Text = ""
+				end)
+			end
+		end
+	end
+end)
