@@ -53,7 +53,7 @@ Instance.new("UICorner", promptCircle).CornerRadius = UDim.new(1, 0)
 
 -- === Main GUI ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 300)
+mainFrame.Size = UDim2.new(0, 180, 0, 320)
 mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
