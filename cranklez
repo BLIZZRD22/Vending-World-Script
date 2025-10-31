@@ -95,6 +95,19 @@ local function makeBox(y, placeholder, default)
 	return box
 end
 
+local function makeLabel(y, text)
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -10, 0, 20)
+	lbl.Position = UDim2.new(0, 5, 0, y)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+	lbl.Font = Enum.Font.GothamSemibold
+	lbl.TextSize = 13
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = contents
+end
+
 local function makeButton(y, text, color)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(1, -10, 0, 35)
@@ -111,15 +124,25 @@ end
 
 -- === Buttons and Inputs ===
 local toggleBtn = makeButton(0, "Auto Click: OFF", Color3.fromRGB(200, 50, 50))
-local nameBox  = makeBox(45, "Item name (blank = all)", targetName)
-local rangeBox = makeBox(85, "Range (studs)", tostring(range))
-local speedBox = makeBox(125, "Click Speed (sec)", tostring(checkInterval))
-local tpSpeedBox = makeBox(165, "Teleport Speed (sec)", tostring(teleportInterval))
-local tpBtn = makeButton(205, "Auto Teleport: OFF", Color3.fromRGB(50, 50, 150))
+
+-- 🏷️ Added Labels
+makeLabel(40, "🎯 Item Name (Blank = All):")
+local nameBox  = makeBox(60, "Item name (blank = all)", targetName)
+
+makeLabel(95, "📏 Range (studs):")
+local rangeBox = makeBox(115, "Range (studs)", tostring(range))
+
+makeLabel(150, "⚡ Click Speed (sec):")
+local speedBox = makeBox(170, "Click Speed (sec)", tostring(checkInterval))
+
+makeLabel(205, "🌀 Teleport Speed (sec):")
+local tpSpeedBox = makeBox(225, "Teleport Speed (sec)", tostring(teleportInterval))
+
+local tpBtn = makeButton(265, "Auto Teleport: OFF", Color3.fromRGB(50, 50, 150))
 
 local tpStatus = Instance.new("TextLabel")
 tpStatus.Size = UDim2.new(1, -10, 0, 20)
-tpStatus.Position = UDim2.new(0, 5, 0, 245)
+tpStatus.Position = UDim2.new(0, 5, 0, 305)
 tpStatus.BackgroundTransparency = 1
 tpStatus.Text = ""
 tpStatus.TextColor3 = Color3.new(0.7, 0.7, 0.7)
